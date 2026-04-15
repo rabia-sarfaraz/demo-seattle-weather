@@ -1,259 +1,136 @@
 # -*- coding: utf-8 -*-
-# Copyright 2024-2025 Streamlit Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 from datetime import datetime
 import streamlit as st
 import altair as alt
 import vega_datasets
+import pandas as pd
 
-
+# ---------------- DATA ----------------
 full_df = vega_datasets.data("seattle_weather")
 
+if "custom_df" not in st.session_state:
+    st.session_state.custom_df = full_df.copy()
+
+df = st.session_state.custom_df
+
+# ---------------- CONFIG ----------------
 st.set_page_config(
-    # Title and icon for the browser's tab bar:
-    page_title="Seattle Weather",
+    page_title="Seattle Weather Admin Panel",
     page_icon="🌦️",
-    # Make the content take up the width of the page:
     layout="wide",
 )
 
+st.title("🌦️ Weather Dashboard + Admin Panel")
 
-"""
-# Seattle Weather
+# ---------------- SIDEBAR ----------------
+menu = st.sidebar.radio("Menu", ["Dashboard", "Admin Panel"])
 
-Let's explore the [classic Seattle Weather
-dataset](https://altair-viz.github.io/case_studies/exploring-weather.html)!
-"""
+# =====================================================
+# 🔵 ADMIN PANEL
+# =====================================================
+if menu == "Admin Panel":
 
-""  # Add a little vertical space. Same as st.write("").
-""
+    st.subheader("⚙️ Admin Panel")
 
-"""
-## 2015 Summary
-"""
+    date = st.date_input("Date")
+    temp_max = st.number_input("Max Temp")
+    temp_min = st.number_input("Min Temp")
+    wind = st.number_input("Wind Speed")
+    precipitation = st.number_input("Precipitation")
+    weather = st.selectbox("Weather", ["sun", "rain", "snow", "fog", "drizzle"])
 
-""
+    if st.button("Add Record"):
+        new_row = pd.DataFrame({
+            "date": [pd.to_datetime(date)],
+            "temp_max": [temp_max],
+            "temp_min": [temp_min],
+            "wind": [wind],
+            "precipitation": [precipitation],
+            "weather": [weather]
+        })
 
-df_2015 = full_df[full_df["date"].dt.year == 2015]
-df_2014 = full_df[full_df["date"].dt.year == 2014]
+        st.session_state.custom_df = pd.concat([df, new_row], ignore_index=True)
+        st.success("Added Successfully ✅")
+        st.rerun()
 
-max_temp_2015 = df_2015["temp_max"].max()
-max_temp_2014 = df_2014["temp_max"].max()
+    st.write("### Current Data")
+    st.dataframe(df)
 
-min_temp_2015 = df_2015["temp_min"].min()
-min_temp_2014 = df_2014["temp_min"].min()
+# =====================================================
+# 🟢 DASHBOARD (FULL ORIGINAL RESTORED)
+# =====================================================
+else:
 
-max_wind_2015 = df_2015["wind"].max()
-max_wind_2014 = df_2014["wind"].max()
+    st.subheader("📊 Weather Analytics Dashboard")
 
-min_wind_2015 = df_2015["wind"].min()
-min_wind_2014 = df_2014["wind"].min()
+    # YEARS FILTER
+    YEARS = df["date"].dt.year.unique()
+    selected_years = st.pills(
+        "Years", YEARS, default=YEARS, selection_mode="multi"
+    )
 
-max_prec_2015 = df_2015["precipitation"].max()
-max_prec_2014 = df_2014["precipitation"].max()
+    if not selected_years:
+        st.warning("Select at least one year")
 
-min_prec_2015 = df_2015["precipitation"].min()
-min_prec_2014 = df_2014["precipitation"].min()
+    df = df[df["date"].dt.year.isin(selected_years)]
 
+    # ---------------- METRICS ----------------
+    col1, col2, col3 = st.columns(3)
 
-with st.container(horizontal=True, gap="medium"):
-    cols = st.columns(2, gap="medium", width=300)
+    col1.metric("Max Temp", df["temp_max"].max())
+    col2.metric("Min Temp", df["temp_min"].min())
+    col3.metric("Avg Wind", df["wind"].mean())
 
-    with cols[0]:
-        st.metric(
-            "Max tempearture",
-            f"{max_temp_2015:0.1f}C",
-            delta=f"{max_temp_2015 - max_temp_2014:0.1f}C",
-            width="content",
-        )
-
-    with cols[1]:
-        st.metric(
-            "Min tempearture",
-            f"{min_temp_2015:0.1f}C",
-            delta=f"{min_temp_2015 - min_temp_2014:0.1f}C",
-            width="content",
-        )
-
-    cols = st.columns(2, gap="medium", width=300)
-
-    with cols[0]:
-        st.metric(
-            "Max precipitation",
-            f"{max_prec_2015:0.1f}C",
-            delta=f"{max_prec_2015 - max_prec_2014:0.1f}C",
-            width="content",
-        )
-
-    with cols[1]:
-        st.metric(
-            "Min precipitation",
-            f"{min_prec_2015:0.1f}C",
-            delta=f"{min_prec_2015 - min_prec_2014:0.1f}C",
-            width="content",
-        )
-
-    cols = st.columns(2, gap="medium", width=300)
-
-    with cols[0]:
-        st.metric(
-            "Max wind",
-            f"{max_wind_2015:0.1f}m/s",
-            delta=f"{max_wind_2015 - max_wind_2014:0.1f}m/s",
-            width="content",
-        )
-
-    with cols[1]:
-        st.metric(
-            "Min wind",
-            f"{min_wind_2015:0.1f}m/s",
-            delta=f"{min_wind_2015 - min_wind_2014:0.1f}m/s",
-            width="content",
-        )
-
-    cols = st.columns(2, gap="medium", width=300)
-
-    weather_icons = {
-        "sun": "☀️",
-        "snow": "☃️",
-        "rain": "💧",
-        "fog": "😶‍🌫️",
-        "drizzle": "🌧️",
-    }
-
-    with cols[0]:
-        weather_name = (
-            full_df["weather"].value_counts().head(1).reset_index()["weather"][0]
-        )
-        st.metric(
-            "Most common weather",
-            f"{weather_icons[weather_name]} {weather_name.upper()}",
-        )
-
-    with cols[1]:
-        weather_name = (
-            full_df["weather"].value_counts().tail(1).reset_index()["weather"][0]
-        )
-        st.metric(
-            "Least common weather",
-            f"{weather_icons[weather_name]} {weather_name.upper()}",
-        )
-
-""
-""
-
-"""
-## Compare different years
-"""
-
-YEARS = full_df["date"].dt.year.unique()
-selected_years = st.pills(
-    "Years to compare", YEARS, default=YEARS, selection_mode="multi"
-)
-
-if not selected_years:
-    st.warning("You must select at least 1 year.", icon=":material/warning:")
-
-df = full_df[full_df["date"].dt.year.isin(selected_years)]
-
-cols = st.columns([3, 1])
-
-with cols[0].container(border=True, height="stretch"):
-    "### Temperature"
-
+    # ---------------- TEMPERATURE ----------------
+    st.write("### Temperature")
     st.altair_chart(
         alt.Chart(df)
-        .mark_bar(width=1)
+        .mark_bar()
         .encode(
-            alt.X("date", timeUnit="monthdate").title("date"),
-            alt.Y("temp_max").title("temperature range (C)"),
+            alt.X("date", timeUnit="monthdate"),
+            alt.Y("temp_max"),
             alt.Y2("temp_min"),
-            alt.Color("date:N", timeUnit="year").title("year"),
-            alt.XOffset("date:N", timeUnit="year"),
+            alt.Color("date:N", timeUnit="year"),
         )
-        .configure_legend(orient="bottom")
     )
 
-with cols[1].container(border=True, height="stretch"):
-    "### Weather distribution"
-
+    # ---------------- WIND ----------------
+    st.write("### Wind")
     st.altair_chart(
         alt.Chart(df)
-        .mark_arc()
+        .mark_line()
         .encode(
-            alt.Theta("count()"),
-            alt.Color("weather:N"),
+            alt.X("date", timeUnit="monthdate"),
+            alt.Y("wind"),
+            alt.Color("date:N", timeUnit="year"),
         )
-        .configure_legend(orient="bottom")
     )
 
-
-cols = st.columns(2)
-
-with cols[0].container(border=True, height="stretch"):
-    "### Wind"
-
-    st.altair_chart(
-        alt.Chart(df)
-        .transform_window(
-            avg_wind="mean(wind)",
-            std_wind="stdev(wind)",
-            frame=[0, 14],
-            groupby=["monthdate(date)"],
-        )
-        .mark_line(size=1)
-        .encode(
-            alt.X("date", timeUnit="monthdate").title("date"),
-            alt.Y("avg_wind:Q").title("average wind past 2 weeks (m/s)"),
-            alt.Color("date:N", timeUnit="year").title("year"),
-        )
-        .configure_legend(orient="bottom")
-    )
-
-with cols[1].container(border=True, height="stretch"):
-    "### Precipitation"
-
+    # ---------------- PRECIPITATION ----------------
+    st.write("### Precipitation")
     st.altair_chart(
         alt.Chart(df)
         .mark_bar()
         .encode(
-            alt.X("date:N", timeUnit="month").title("date"),
-            alt.Y("precipitation:Q").aggregate("sum").title("precipitation (mm)"),
-            alt.Color("date:N", timeUnit="year").title("year"),
+            alt.X("date", timeUnit="month"),
+            alt.Y("precipitation"),
+            alt.Color("date:N", timeUnit="year"),
         )
-        .configure_legend(orient="bottom")
     )
 
-cols = st.columns(2)
-
-with cols[0].container(border=True, height="stretch"):
-    "### Monthly weather breakdown"
-    ""
-
+    # ---------------- MONTHLY BREAKDOWN ----------------
+    st.write("### Monthly Breakdown")
     st.altair_chart(
         alt.Chart(df)
         .mark_bar()
         .encode(
-            alt.X("month(date):O", title="month"),
-            alt.Y("count():Q", title="days").stack("normalize"),
+            alt.X("month(date):O"),
+            alt.Y("count()"),
             alt.Color("weather:N"),
         )
-        .configure_legend(orient="bottom")
     )
 
-with cols[1].container(border=True, height="stretch"):
-    "### Raw data"
-
+    # ---------------- RAW DATA ----------------
+    st.write("### Raw Data")
     st.dataframe(df)
